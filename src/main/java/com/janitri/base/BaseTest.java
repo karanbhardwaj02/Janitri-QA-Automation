@@ -9,9 +9,9 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeOptions;
-import org.openqa.selenium.remote.CapabilityType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 
 import java.time.Duration;
@@ -23,15 +23,14 @@ public class BaseTest {
 
     @BeforeClass(alwaysRun = true)
     @Parameters({"browser"})
-    public void setUp(String browser) {
+    public void setUp(@Optional("chrome") String browser) {
         String headless = System.getProperty("headless", "false");
-        if (browser == null) browser = "chrome";
 
         switch (browser.toLowerCase()) {
             case "firefox":
                 WebDriverManager.firefoxdriver().setup();
                 FirefoxOptions ff = new FirefoxOptions();
-                if (Boolean.parseBoolean(headless)) ff.addArguments("-headless");
+                if (Boolean.parseBoolean(headless)) ff.addArguments("-headless"); // correct flag
                 driver = new FirefoxDriver(ff);
                 break;
             case "edge":
@@ -40,10 +39,9 @@ public class BaseTest {
                 if (Boolean.parseBoolean(headless)) edge.addArguments("--headless=new");
                 driver = new EdgeDriver(edge);
                 break;
-            default:
+            default: // chrome
                 WebDriverManager.chromedriver().setup();
                 ChromeOptions options = new ChromeOptions();
-                // Auto-allow notifications and disable popups
                 Map<String, Object> prefs = new HashMap<>();
                 prefs.put("profile.default_content_setting_values.notifications", 1);
                 prefs.put("credentials_enable_service", false);
@@ -56,13 +54,21 @@ public class BaseTest {
                 driver = new ChromeDriver(options);
         }
 
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(
-            Long.parseLong(Config.get("implicitWaitSeconds"))
-        ));
-        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(
-            Long.parseLong(Config.get("pageLoadTimeoutSeconds"))
-        ));
+        long implicitWait = parseLongOrDefault(Config.get("implicitWaitSeconds"), 10);
+        long pageLoadTimeout = parseLongOrDefault(Config.get("pageLoadTimeoutSeconds"), 30);
+
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(implicitWait));
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(pageLoadTimeout));
         driver.get(Config.get("baseUrl"));
+    }
+
+    private long parseLongOrDefault(String value, long defaultValue) {
+        try {
+            if (value == null || value.isEmpty()) return defaultValue;
+            return Long.parseLong(value);
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 
     @AfterClass(alwaysRun = true)
